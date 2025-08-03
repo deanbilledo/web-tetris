@@ -17,6 +17,7 @@ const PIECES = [
 let board, current, next, hold, canHold, bag, score, level, lines, dropInterval, dropTimer, paused, gameOver;
 let keys = {}, touchStart = null, volume = 0.5, muted = false;
 let canvas, ctx, bgCanvas, bgCtx;
+let gameStartTime = 0, gameDuration = 0;
 
 // --- AUDIO ---
 const audioCtx = window.AudioContext ? new window.AudioContext() : null;
@@ -217,7 +218,9 @@ function placePiece() {
   
   if (!isValidMove(current, 0, 0)) {
     gameOver = true;
+    gameDuration = Date.now() - gameStartTime;
     playSound('gameover');
+    showGameOverPopup();
   }
 }
 
@@ -273,6 +276,12 @@ function draw() {
   document.getElementById('score').textContent = score;
   document.getElementById('level').textContent = level;
   document.getElementById('lines').textContent = lines;
+  
+  // Update time display
+  if (!gameOver && gameStartTime > 0) {
+    const currentTime = Date.now() - gameStartTime;
+    document.getElementById('game-time').textContent = formatTime(currentTime);
+  }
 }
 
 function drawBackground() {
@@ -298,6 +307,36 @@ function drawBackground() {
     bgCtx.lineTo(bgCanvas.width, y * BLOCK);
     bgCtx.stroke();
   }
+}
+
+// --- GAME OVER POPUP ---
+function showGameOverPopup() {
+  const popup = document.getElementById('game-over-popup');
+  const finalScore = document.getElementById('final-score');
+  const finalLevel = document.getElementById('final-level');
+  const finalLines = document.getElementById('final-lines');
+  const finalTime = document.getElementById('final-time');
+  
+  // Update stats
+  finalScore.textContent = score.toLocaleString();
+  finalLevel.textContent = level;
+  finalLines.textContent = lines;
+  finalTime.textContent = formatTime(gameDuration);
+  
+  // Show popup
+  popup.style.display = 'flex';
+}
+
+function hideGameOverPopup() {
+  const popup = document.getElementById('game-over-popup');
+  popup.style.display = 'none';
+}
+
+function formatTime(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 // --- GAME LOOP ---
@@ -333,7 +372,13 @@ function resetGame() {
   dropTimer = 0;
   paused = false;
   gameOver = false;
+  gameStartTime = Date.now();
+  gameDuration = 0;
   
+  // Reset UI displays
+  document.getElementById('game-time').textContent = '0:00';
+  
+  hideGameOverPopup();
   drawBackground();
 }
 
@@ -485,6 +530,11 @@ document.addEventListener('DOMContentLoaded', () => {
   
   document.getElementById('volume-slider').oninput = e => {
     volume = parseFloat(e.target.value);
+  };
+  
+  // Restart button
+  document.getElementById('restart-button').onclick = () => {
+    resetGame();
   };
   
   resetGame();

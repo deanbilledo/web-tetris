@@ -14,6 +14,7 @@
         <div>Score: <span id="score">0</span></div>
         <div>Level: <span id="level">1</span></div>
         <div>Lines: <span id="lines">0</span></div>
+        <div>Time: <span id="game-time">0:00</span></div>
       </div>
       <div>Next:</div>
       <div class="next-piece" id="next-piece"></div>
@@ -42,6 +43,33 @@
       </div>
     </div>
   </div>
+  
+  <!-- Game Over Popup -->
+  <div class="game-over-popup" id="game-over-popup">
+    <div class="game-over-content">
+      <div class="game-over-title">GAME OVER</div>
+      <div class="game-over-stats">
+        <div class="game-over-stat">
+          <span class="stat-label">Final Score:</span>
+          <span class="stat-value" id="final-score">0</span>
+        </div>
+        <div class="game-over-stat">
+          <span class="stat-label">Level Reached:</span>
+          <span class="stat-value" id="final-level">1</span>
+        </div>
+        <div class="game-over-stat">
+          <span class="stat-label">Lines Cleared:</span>
+          <span class="stat-value" id="final-lines">0</span>
+        </div>
+        <div class="game-over-stat">
+          <span class="stat-label">Time Played:</span>
+          <span class="stat-value" id="final-time">0:00</span>
+        </div>
+      </div>
+      <button class="restart-button" id="restart-button">TRY AGAIN</button>
+    </div>
+  </div>
+  
   <script src="script.js"></script>
 </body>
 </html>
