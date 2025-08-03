@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris Neo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="tetris-container">
+    <div class="game-panel">
+      <h2>TETRIS NEO</h2>
+      <div class="stats">
+        <div>Score: <span id="score">0</span></div>
+        <div>Level: <span id="level">1</span></div>
+        <div>Lines: <span id="lines">0</span></div>
+      </div>
+      <div>Next:</div>
+      <div class="next-piece" id="next-piece"></div>
+      <div>Hold:</div>
+      <div class="hold-piece" id="hold-piece"></div>
+      <div class="audio-controls">
+        <button id="mute-btn">Mute</button>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+      </div>
+      <div class="controls">
+        <strong>Controls</strong><br>
+        ← → : Move<br>
+        ↑ : Rotate<br>
+        ↓ : Soft Drop<br>
+        Space: Hard Drop<br>
+        Shift: Hold<br>
+        P: Pause/Resume<br>
+        <small>Mobile: Swipe/Tap</small>
+      </div>
+    </div>
+    <div class="game-canvas-container">
+      <canvas id="tetris" width="320" height="480"></canvas>
+      <canvas class="bg-anim" id="bg-anim" width="320" height="480"></canvas>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
