@@ -233,9 +233,14 @@ canvas {
   
   .mobile-hint {
     display: block;
-    position: static;
-    transform: none;
-    margin-top: 10px;
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 0;
+    z-index: 1000;
+    width: auto;
+    max-width: 90vw;
   }
 }
 
@@ -270,6 +275,12 @@ canvas {
   .next-piece, .hold-piece {
     width: 50px;
     height: 50px;
+  }
+  
+  .mobile-hint {
+    bottom: 5px;
+    font-size: 0.7em;
+    padding: 6px 12px;
   }
 }
 

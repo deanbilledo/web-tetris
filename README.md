@@ -4,7 +4,7 @@ A modern, responsive Tetris game built with vanilla HTML5, CSS3, and JavaScript.
 
 ## 🎯 Play Now
 
-**[🚀 Play Tetris Neo](https://your-username.github.io/web-tetris)**
+**[🚀 Play Tetris Neo](http://petcareconnect.me/web-tetris/)**
 
 *Replace the link above with your actual deployment URL*
 

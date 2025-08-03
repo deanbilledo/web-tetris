@@ -121,8 +121,44 @@ function move(dx, dy) {
 
 function rotate() {
   if (gameOver || paused || !current) return;
-  // Simple rotation for now
-  playSound('rotate');
+  
+  // Create rotated shape
+  const rotated = [];
+  for (let [x, y] of current.shape) {
+    // Rotate 90 degrees clockwise: (x, y) -> (y, -x)
+    rotated.push([y, -x]);
+  }
+  
+  // Normalize coordinates (make sure min x and y are 0)
+  const minX = Math.min(...rotated.map(([x, y]) => x));
+  const minY = Math.min(...rotated.map(([x, y]) => y));
+  
+  const normalizedShape = rotated.map(([x, y]) => [x - minX, y - minY]);
+  
+  // Try to place the rotated piece
+  const originalShape = current.shape;
+  current.shape = normalizedShape;
+  
+  // Check if rotation is valid
+  if (isValidMove(current, 0, 0)) {
+    playSound('rotate');
+  } else {
+    // Try wall kicks - move left/right if rotation hits wall
+    let kicked = false;
+    for (let kick of [-1, 1, -2, 2]) {
+      if (isValidMove(current, kick, 0)) {
+        current.x += kick;
+        playSound('rotate');
+        kicked = true;
+        break;
+      }
+    }
+    
+    if (!kicked) {
+      // Revert rotation if no valid position found
+      current.shape = originalShape;
+    }
+  }
 }
 
 function softDrop() {
@@ -337,11 +373,13 @@ function setupTouchControls() {
   if (!canvas) return;
   
   let touchStartPos = null;
+  let touchStartTime = 0;
   
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     const touch = e.touches[0];
     touchStartPos = { x: touch.clientX, y: touch.clientY };
+    touchStartTime = Date.now();
   });
   
   canvas.addEventListener('touchend', e => {
@@ -352,21 +390,43 @@ function setupTouchControls() {
     const dx = touch.clientX - touchStartPos.x;
     const dy = touch.clientY - touchStartPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
+    const touchDuration = Date.now() - touchStartTime;
     
-    if (distance < 30) {
-      // Tap to rotate
+    // Quick tap to rotate (less than 300ms and minimal movement)
+    if (touchDuration < 300 && distance < 40) {
       rotate();
-    } else if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal swipe
-      if (dx > 0) move(1, 0);
-      else move(-1, 0);
-    } else {
-      // Vertical swipe
-      if (dy > 0) softDrop();
-      else hardDrop();
+      console.log('Tap to rotate triggered');
+    } 
+    // Swipe gestures - require minimum distance and not too slow
+    else if (distance > 50 && touchDuration < 800) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal swipe
+        if (dx > 0) {
+          move(1, 0);
+          console.log('Swipe right');
+        } else {
+          move(-1, 0);
+          console.log('Swipe left');
+        }
+      } else {
+        // Vertical swipe
+        if (dy > 0) {
+          softDrop();
+          console.log('Swipe down');
+        } else {
+          hardDrop();
+          console.log('Swipe up');
+        }
+      }
     }
     
     touchStartPos = null;
+    touchStartTime = 0;
+  });
+  
+  // Prevent scrolling when touching the canvas
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
   });
 }
 
