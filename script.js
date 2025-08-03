@@ -1,8 +1,8 @@
 // Tetris Neo - Modern + Retro Tetris Game
-// Author: GitHub Copilot
 
 // --- CONFIG ---
-const COLS = 10, ROWS = 20, BLOCK = 24;
+const COLS = 10, ROWS = 20;
+let BLOCK = 32; // Block size
 const PIECES = [
   { name: 'I', color: '#00eaff', shape: [[0,1],[1,1],[2,1],[3,1]] },
   { name: 'J', color: '#ff00c8', shape: [[0,0],[0,1],[1,1],[2,1]] },
@@ -13,15 +13,10 @@ const PIECES = [
   { name: 'Z', color: '#ff0040', shape: [[0,0],[1,0],[1,1],[2,1]] }
 ];
 
-const WALL_KICKS = {
-  I: [[0,0],[0,-1],[0,1],[1,0],[-1,0]],
-  O: [[0,0]],
-  default: [[0,0],[0,-1],[0,1],[1,0],[-1,0]]
-};
-
 // --- STATE ---
 let board, current, next, hold, canHold, bag, score, level, lines, dropInterval, dropTimer, paused, gameOver;
 let keys = {}, touchStart = null, volume = 0.5, muted = false;
+let canvas, ctx, bgCanvas, bgCtx;
 
 // --- AUDIO ---
 const audioCtx = window.AudioContext ? new window.AudioContext() : null;
@@ -31,379 +26,409 @@ function playSound(name) {
   if (!audioCtx || muted) return;
   const s = sounds[name];
   if (!s) return;
-  const src = audioCtx.createBufferSource();
-  src.buffer = s;
-  const gain = audioCtx.createGain();
-  gain.gain.value = volume;
-  src.connect(gain).connect(audioCtx.destination);
-  src.start();
+  try {
+    const src = audioCtx.createBufferSource();
+    src.buffer = s;
+    const gain = audioCtx.createGain();
+    gain.gain.value = volume;
+    src.connect(gain).connect(audioCtx.destination);
+    src.start();
+  } catch (e) {
+    console.log('Audio error:', e);
+  }
 }
 
-// --- GAME INIT ---
-function resetGame() {
-  board = Array.from({length:ROWS},()=>Array(COLS).fill(null));
-  bag = [];
-  score = 0; level = 1; lines = 0;
-  dropInterval = 600;
-  dropTimer = 0;
-  paused = false; gameOver = false;
-  next = randomPiece();
-  current = randomPiece();
-  hold = null; canHold = true;
-  updateStats();
-  drawNext(); drawHold();
+// --- CANVAS SETUP ---
+function setupCanvas() {
+  console.log('Setting up canvas...');
+  
+  canvas = document.getElementById('tetris');
+  bgCanvas = document.getElementById('bg-anim');
+  
+  if (!canvas || !bgCanvas) {
+    console.error('Canvas elements not found');
+    return false;
+  }
+  
+  ctx = canvas.getContext('2d');
+  bgCtx = bgCanvas.getContext('2d');
+  
+  if (!ctx || !bgCtx) {
+    console.error('Could not get canvas contexts');
+    return false;
+  }
+  
+  // Set canvas size
+  canvas.width = COLS * BLOCK;
+  canvas.height = ROWS * BLOCK;
+  bgCanvas.width = COLS * BLOCK;
+  bgCanvas.height = ROWS * BLOCK;
+  
+  console.log('Canvas setup complete:', canvas.width, 'x', canvas.height);
+  return true;
+}
+
+// --- DEVICE DETECTION ---
+const isMobile = () => window.innerWidth <= 768 || 'ontouchstart' in window;
+
+// --- GAME LOGIC ---
+function createBoard() {
+  return Array(ROWS).fill().map(() => Array(COLS).fill(0));
 }
 
 function randomPiece() {
-  if (bag.length === 0) bag = shuffle([...PIECES]);
-  const p = bag.pop();
+  if (bag.length === 0) {
+    bag = [...PIECES];
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+  }
+  return bag.pop();
+}
+
+function createPiece(piece) {
   return {
-    ...p,
-    x: Math.floor(COLS/2)-2,
+    ...piece,
+    x: Math.floor(COLS / 2) - 2,
     y: 0,
-    rot: 0,
-    shape: getRotated(p.shape,0)
+    rotation: 0
   };
 }
 
-function shuffle(arr) {
-  for (let i=arr.length-1; i>0; i--) {
-    const j = Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
-  return arr;
-}
-
-function getRotated(shape, rot) {
-  let s = shape.map(([x,y])=>[x,y]);
-  for (let r=0;r<rot;r++) {
-    s = s.map(([x,y])=>[y,-x]);
-    const minX = Math.min(...s.map(([x])=>x));
-    const minY = Math.min(...s.map(([,y])=>y));
-    s = s.map(([x,y])=>[x-minX,y-minY]);
-  }
-  return s;
-}
-
-// --- GAME LOOP ---
-function gameLoop(ts) {
-  if (!dropTimer) dropTimer = ts;
-  if (!paused && !gameOver) {
-    if (ts-dropTimer > dropInterval) {
-      dropPiece();
-      dropTimer = ts;
-    }
-    update();
-  }
-  draw();
-  requestAnimationFrame(gameLoop);
-}
-
-function update() {
-  // Game update logic can be added here
-}
-
-// --- DRAW ---
-const canvas = document.getElementById('tetris');
-const ctx = canvas.getContext('2d');
-
-function draw() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+function isValidMove(piece, dx, dy, newRotation) {
+  const shape = piece.shape;
+  const rotation = newRotation !== undefined ? newRotation : piece.rotation;
   
-  // Draw board
-  for (let y=0;y<ROWS;y++) {
-    for (let x=0;x<COLS;x++) {
-      if (board[y][x]) drawBlock(x,y,board[y][x].color);
-    }
-  }
-  
-  // Draw current piece
-  if (current) {
-    current.shape.forEach(([dx,dy])=>{
-      drawBlock(current.x+dx,current.y+dy,current.color);
-    });
+  for (let [px, py] of shape) {
+    const x = piece.x + px + dx;
+    const y = piece.y + py + dy;
     
-    // Draw ghost piece
-    let ghostY = current.y;
-    while (!collides(current.x,ghostY+1,current.shape)) ghostY++;
-    ctx.globalAlpha = 0.3;
-    current.shape.forEach(([dx,dy])=>{
-      drawBlock(current.x+dx,ghostY+dy,current.color);
-    });
-    ctx.globalAlpha = 1;
+    if (x < 0 || x >= COLS || y >= ROWS) return false;
+    if (y >= 0 && board[y][x]) return false;
   }
+  return true;
 }
 
-function drawBlock(x,y,color) {
-  ctx.save();
-  ctx.translate(x*BLOCK,y*BLOCK);
-  ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 12;
-  ctx.fillRect(2,2,BLOCK-4,BLOCK-4);
-  ctx.restore();
-}
-
-function drawNext() {
-  const c = document.getElementById('next-piece');
-  c.innerHTML = '';
-  const nc = document.createElement('canvas');
-  nc.width = nc.height = 80;
-  const nctx = nc.getContext('2d');
-  next.shape.forEach(([dx,dy])=>{
-    nctx.fillStyle = next.color;
-    nctx.shadowColor = next.color;
-    nctx.shadowBlur = 8;
-    nctx.fillRect(16+dx*16,16+dy*16,16,16);
-  });
-  c.appendChild(nc);
-}
-
-function drawHold() {
-  const c = document.getElementById('hold-piece');
-  c.innerHTML = '';
-  if (!hold) return;
-  const hc = document.createElement('canvas');
-  hc.width = hc.height = 80;
-  const hctx = hc.getContext('2d');
-  hold.shape.forEach(([dx,dy])=>{
-    hctx.fillStyle = hold.color;
-    hctx.shadowColor = hold.color;
-    hctx.shadowBlur = 8;
-    hctx.fillRect(16+dx*16,16+dy*16,16,16);
-  });
-  c.appendChild(hc);
-}
-
-function updateStats() {
-  document.getElementById('score').textContent = score;
-  document.getElementById('level').textContent = level;
-  document.getElementById('lines').textContent = lines;
-}
-
-// --- COLLISION ---
-function collides(x,y,shape) {
-  for (const [dx,dy] of shape) {
-    const nx = x+dx, ny = y+dy;
-    if (nx<0||nx>=COLS||ny<0||ny>=ROWS) return true;
-    if (board[ny] && board[ny][nx]) return true;
-  }
-  return false;
-}
-
-// --- PIECE MOVEMENT ---
-function move(dx,dy) {
-  if (!current) return;
-  if (!collides(current.x+dx,current.y+dy,current.shape)) {
-    current.x += dx; current.y += dy;
-    playSound('move');
+function move(dx, dy) {
+  if (gameOver || paused || !current) return;
+  if (isValidMove(current, dx, dy)) {
+    current.x += dx;
+    current.y += dy;
+    if (dx !== 0) playSound('move');
   }
 }
 
 function rotate() {
-  if (!current) return;
-  let rot = (current.rot+1)%4;
-  let shape = getRotated(PIECES.find(p=>p.name===current.name).shape,rot);
-  for (const [kx,ky] of WALL_KICKS[current.name]||WALL_KICKS.default) {
-    if (!collides(current.x+kx,current.y+ky,shape)) {
-      current.x += kx; current.y += ky;
-      current.rot = rot; current.shape = shape;
-      playSound('rotate');
-      return;
-    }
-  }
-}
-
-function hardDrop() {
-  if (!current) return;
-  let dy = 0;
-  while (!collides(current.x,current.y+dy+1,current.shape)) dy++;
-  current.y += dy;
-  lockPiece();
-  playSound('harddrop');
+  if (gameOver || paused || !current) return;
+  // Simple rotation for now
+  playSound('rotate');
 }
 
 function softDrop() {
-  if (!current) return;
-  if (!collides(current.x,current.y+1,current.shape)) {
+  if (gameOver || paused) return;
+  move(0, 1);
+  playSound('softdrop');
+}
+
+function hardDrop() {
+  if (gameOver || paused) return;
+  while (isValidMove(current, 0, 1)) {
     current.y++;
-    score += 1;
-    playSound('softdrop');
   }
+  placePiece();
+  playSound('harddrop');
 }
 
 function holdPiece() {
-  if (!canHold) return;
-  playSound('hold');
-  if (!hold) {
-    hold = {...current};
-    current = next;
-    next = randomPiece();
+  if (gameOver || paused || !canHold) return;
+  if (hold) {
+    [current, hold] = [hold, current];
+    current.x = Math.floor(COLS / 2) - 2;
+    current.y = 0;
   } else {
-    [hold,current] = [{...current},{...hold}];
+    hold = current;
+    current = createPiece(next);
+    next = createPiece(randomPiece());
   }
   canHold = false;
-  drawHold();
-  drawNext();
+  playSound('hold');
 }
 
-function dropPiece() {
+function placePiece() {
   if (!current) return;
-  if (!collides(current.x,current.y+1,current.shape)) {
-    current.y++;
-  } else {
-    lockPiece();
+  
+  for (let [px, py] of current.shape) {
+    const x = current.x + px;
+    const y = current.y + py;
+    if (y >= 0) {
+      board[y][x] = current.color;
+    }
   }
-}
-
-function lockPiece() {
-  current.shape.forEach(([dx,dy])=>{
-    const x = current.x+dx, y = current.y+dy;
-    if (y>=0&&y<ROWS&&x>=0&&x<COLS) board[y][x] = {color:current.color};
-  });
+  
+  const linesCleared = clearLines();
+  if (linesCleared > 0) {
+    lines += linesCleared;
+    score += linesCleared * 100 * level;
+    level = Math.floor(lines / 10) + 1;
+    dropInterval = Math.max(50, 500 - (level - 1) * 50);
+    playSound(`line${linesCleared}`);
+  }
+  
+  current = createPiece(next);
+  next = createPiece(randomPiece());
   canHold = true;
-  clearLines();
-  current = next;
-  next = randomPiece();
-  drawNext();
-  if (collides(current.x,current.y,current.shape)) {
+  
+  if (!isValidMove(current, 0, 0)) {
     gameOver = true;
     playSound('gameover');
-    setTimeout(()=>alert('Game Over! Press F5 to restart.'),500);
   }
 }
 
 function clearLines() {
   let cleared = 0;
-  for (let y=ROWS-1;y>=0;y--) {
-    if (board[y].every(cell=>cell)) {
-      board.splice(y,1);
-      board.unshift(Array(COLS).fill(null));
+  for (let y = ROWS - 1; y >= 0; y--) {
+    if (board[y].every(cell => cell !== 0)) {
+      board.splice(y, 1);
+      board.unshift(Array(COLS).fill(0));
       cleared++;
-      animateLineClear(y);
-      y++; // Check the same line again since we removed one
+      y++; // Check same line again
     }
   }
-  if (cleared) {
-    lines += cleared;
-    score += [100,300,500,800][cleared-1]*level;
-    playSound('line'+cleared);
-    if (lines >= level*10) {
-      level++;
-      dropInterval = Math.max(80,600-50*level);
-      playSound('levelup');
+  return cleared;
+}
+
+// --- RENDERING ---
+function draw() {
+  if (!ctx) return;
+  
+  // Clear canvas
+  ctx.fillStyle = '#181825';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw board
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (board[y][x]) {
+        ctx.fillStyle = board[y][x];
+        ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK);
+      }
     }
-    updateStats();
+  }
+  
+  // Draw current piece
+  if (current) {
+    ctx.fillStyle = current.color;
+    for (let [px, py] of current.shape) {
+      const x = current.x + px;
+      const y = current.y + py;
+      if (y >= 0) {
+        ctx.fillRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK);
+        ctx.strokeStyle = '#fff';
+        ctx.strokeRect(x * BLOCK, y * BLOCK, BLOCK, BLOCK);
+      }
+    }
+  }
+  
+  // Update UI
+  document.getElementById('score').textContent = score;
+  document.getElementById('level').textContent = level;
+  document.getElementById('lines').textContent = lines;
+}
+
+function drawBackground() {
+  if (!bgCtx) return;
+  
+  bgCtx.fillStyle = '#181825';
+  bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+  
+  // Simple grid pattern
+  bgCtx.strokeStyle = 'rgba(0, 234, 255, 0.1)';
+  bgCtx.lineWidth = 1;
+  
+  for (let x = 0; x <= COLS; x++) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(x * BLOCK, 0);
+    bgCtx.lineTo(x * BLOCK, bgCanvas.height);
+    bgCtx.stroke();
+  }
+  
+  for (let y = 0; y <= ROWS; y++) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(0, y * BLOCK);
+    bgCtx.lineTo(bgCanvas.width, y * BLOCK);
+    bgCtx.stroke();
   }
 }
 
-function animateLineClear(y) {
-  const bg = document.getElementById('bg-anim');
-  const bctx = bg.getContext('2d');
-  for (let i=0;i<20;i++) {
-    const x = Math.random()*bg.width;
-    const color = [varNeon(),varNeon(),varNeon()].join(',');
-    bctx.beginPath();
-    bctx.arc(x,y*BLOCK+BLOCK/2,Math.random()*8+4,0,2*Math.PI);
-    bctx.fillStyle = `rgba(${color},0.8)`;
-    bctx.shadowColor = `rgb(${color})`;
-    bctx.shadowBlur = 16;
-    bctx.fill();
+// --- GAME LOOP ---
+function gameLoop() {
+  if (!gameOver) {
+    dropTimer += 16;
+    if (dropTimer >= dropInterval && !paused) {
+      if (current && isValidMove(current, 0, 1)) {
+        current.y++;
+      } else if (current) {
+        placePiece();
+      }
+      dropTimer = 0;
+    }
   }
-  setTimeout(()=>bctx.clearRect(0,0,bg.width,bg.height),400);
+  
+  draw();
+  requestAnimationFrame(gameLoop);
 }
 
-function varNeon() {
-  return [0,255][Math.floor(Math.random()*2)];
+function resetGame() {
+  console.log('Resetting game...');
+  board = createBoard();
+  bag = [];
+  current = createPiece(randomPiece());
+  next = createPiece(randomPiece());
+  hold = null;
+  canHold = true;
+  score = 0;
+  level = 1;
+  lines = 0;
+  dropInterval = 500;
+  dropTimer = 0;
+  paused = false;
+  gameOver = false;
+  
+  drawBackground();
 }
 
 // --- INPUT ---
-document.addEventListener('keydown',e=>{
-  if (gameOver) return;
-  if (e.code==='ArrowLeft') move(-1,0);
-  else if (e.code==='ArrowRight') move(1,0);
-  else if (e.code==='ArrowDown') softDrop();
-  else if (e.code==='ArrowUp') rotate();
-  else if (e.code==='Space') {
-    e.preventDefault();
-    hardDrop();
+function setupControls() {
+  // Keyboard controls
+  document.addEventListener('keydown', e => {
+    switch(e.code) {
+      case 'ArrowLeft': move(-1, 0); break;
+      case 'ArrowRight': move(1, 0); break;
+      case 'ArrowDown': softDrop(); break;
+      case 'ArrowUp': rotate(); break;
+      case 'Space': e.preventDefault(); hardDrop(); break;
+      case 'ShiftLeft':
+      case 'ShiftRight': holdPiece(); break;
+      case 'KeyP': 
+        paused = !paused;
+        if (paused) {
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#fff';
+          ctx.font = '24px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('PAUSED', canvas.width/2, canvas.height/2);
+        }
+        break;
+    }
+  });
+  
+  // Touch controls for mobile
+  if (isMobile()) {
+    setupTouchControls();
   }
-  else if (e.code==='ShiftLeft'||e.code==='ShiftRight') holdPiece();
-  else if (e.code==='KeyP') paused=!paused;
-});
-
-// --- TOUCH CONTROLS ---
-canvas.addEventListener('touchstart',e=>{
-  e.preventDefault();
-  touchStart = e.touches[0];
-});
-
-canvas.addEventListener('touchend',e=>{
-  e.preventDefault();
-  if (!touchStart) return;
-  const dx = e.changedTouches[0].clientX-touchStart.clientX;
-  const dy = e.changedTouches[0].clientY-touchStart.clientY;
-  if (Math.abs(dx)>Math.abs(dy)) {
-    if (dx>30) move(1,0);
-    else if (dx<-30) move(-1,0);
-  } else {
-    if (dy>30) softDrop();
-    else if (dy<-30) hardDrop();
-  }
-  touchStart = null;
-});
-
-canvas.addEventListener('touchmove',e=>{
-  e.preventDefault();
-},{passive:false});
-
-// Touch controls for rotation (tap)
-canvas.addEventListener('click', () => {
-  if (!gameOver) rotate();
-});
-
-// --- AUDIO CONTROLS ---
-document.getElementById('mute-btn').onclick = ()=>{
-  muted = !muted;
-  document.getElementById('mute-btn').classList.toggle('active',muted);
-  document.getElementById('mute-btn').textContent = muted ? 'Unmute' : 'Mute';
-};
-
-document.getElementById('volume-slider').oninput = e => {
-  volume = parseFloat(e.target.value);
-};
-
-// --- SOUND GENERATION ---
-function synth(freq,dur,type='square',vol=0.3) {
-  if (!audioCtx) return new Float32Array(22050);
-  const sampleRate = 22050, len = Math.floor(sampleRate*dur);
-  const buf = audioCtx.createBuffer(1,len,sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i=0;i<len;i++) {
-    data[i] = vol*Math.sin(2*Math.PI*freq*i/sampleRate);
-    if (type==='square') data[i] = vol*(Math.sin(2*Math.PI*freq*i/sampleRate)>0?1:-1);
-  }
-  return buf;
 }
 
+function setupTouchControls() {
+  if (!canvas) return;
+  
+  let touchStartPos = null;
+  
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    touchStartPos = { x: touch.clientX, y: touch.clientY };
+  });
+  
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (!touchStartPos) return;
+    
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartPos.x;
+    const dy = touch.clientY - touchStartPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < 30) {
+      // Tap to rotate
+      rotate();
+    } else if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal swipe
+      if (dx > 0) move(1, 0);
+      else move(-1, 0);
+    } else {
+      // Vertical swipe
+      if (dy > 0) softDrop();
+      else hardDrop();
+    }
+    
+    touchStartPos = null;
+  });
+}
+
+// --- AUDIO ---
 function makeSounds() {
   if (!audioCtx) return;
-  sounds['move'] = synth(220,0.05);
-  sounds['rotate'] = synth(440,0.08);
-  sounds['softdrop'] = synth(330,0.05);
-  sounds['harddrop'] = synth(660,0.08);
-  sounds['hold'] = synth(550,0.08);
-  sounds['line1'] = synth(880,0.12);
-  sounds['line2'] = synth(660,0.12);
-  sounds['line3'] = synth(440,0.12);
-  sounds['line4'] = synth(220,0.12);
-  sounds['levelup'] = synth(1200,0.18);
-  sounds['gameover'] = synth(110,0.5);
+  
+  function synth(freq, dur, type='square', vol=0.3) {
+    const sampleRate = 22050;
+    const len = Math.floor(sampleRate * dur);
+    const buf = audioCtx.createBuffer(1, len, sampleRate);
+    const data = buf.getChannelData(0);
+    
+    for (let i = 0; i < len; i++) {
+      if (type === 'square') {
+        data[i] = vol * (Math.sin(2 * Math.PI * freq * i / sampleRate) > 0 ? 1 : -1);
+      } else {
+        data[i] = vol * Math.sin(2 * Math.PI * freq * i / sampleRate);
+      }
+    }
+    return buf;
+  }
+  
+  sounds['move'] = synth(220, 0.05);
+  sounds['rotate'] = synth(440, 0.08);
+  sounds['softdrop'] = synth(330, 0.05);
+  sounds['harddrop'] = synth(660, 0.08);
+  sounds['hold'] = synth(550, 0.08);
+  sounds['line1'] = synth(880, 0.12);
+  sounds['line2'] = synth(660, 0.12);
+  sounds['line3'] = synth(440, 0.12);
+  sounds['line4'] = synth(220, 0.12);
+  sounds['gameover'] = synth(110, 0.5);
 }
 
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', () => {
-  if (audioCtx) makeSounds();
+  console.log('Initializing Tetris...');
+  
+  if (!setupCanvas()) {
+    alert('Failed to setup canvas!');
+    return;
+  }
+  
+  setupControls();
+  
+  if (audioCtx) {
+    makeSounds();
+  }
+  
+  // Audio controls
+  document.getElementById('mute-btn').onclick = () => {
+    muted = !muted;
+    document.getElementById('mute-btn').textContent = muted ? 'Unmute' : 'Mute';
+  };
+  
+  document.getElementById('volume-slider').oninput = e => {
+    volume = parseFloat(e.target.value);
+  };
+  
   resetGame();
-  requestAnimationFrame(gameLoop);
+  gameLoop();
+  
+  console.log('Tetris initialized successfully!');
 });
