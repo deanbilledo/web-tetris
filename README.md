@@ -14,21 +14,21 @@ A modern, responsive Tetris game built with vanilla HTML5, CSS3, and JavaScript.
 - **Classic Tetris Mechanics**: All 7 standard Tetriminos (I, O, T, S, Z, J, L)
 - **Line Clearing**: Clear 1-4 lines simultaneously with satisfying animations
 - **Progressive Difficulty**: Speed increases as you advance through levels
-- **Hold Function**: Store a piece for later use (Shift key)
+- **Next Piece Preview**: See upcoming piece (desktop only)
 - **Hard Drop**: Instantly drop pieces to the bottom (Space key)
 - **Soft Drop**: Manually drop pieces faster (Down arrow)
 
 ### 📱 Cross-Platform Support
-- **Desktop Controls**: Arrow keys for movement, Space for hard drop, Shift for hold
+- **Desktop Controls**: Arrow keys for movement, Space for hard drop
 - **Mobile Touch Controls**: Intuitive swipe gestures and tap-to-rotate
 - **Responsive Design**: Optimized for desktop, tablet, and mobile devices
 - **Adaptive UI**: Interface adjusts automatically based on screen size
+- **Mobile-First Design**: Streamlined interface for mobile gameplay
 
 ### 🎵 Audio Experience
 - **Retro Sound Effects**: Synthesized classic Tetris sounds
 - **Web Audio API**: High-quality audio synthesis
-- **Volume Control**: Adjustable volume slider
-- **Mute Option**: Toggle sound on/off
+- **Audio Controls**: Available on desktop (hidden on mobile for cleaner UI)
 
 ### 🎨 Modern Visual Design
 - **Neon Aesthetic**: Cyberpunk-inspired color scheme with glowing effects
@@ -43,7 +43,6 @@ A modern, responsive Tetris game built with vanilla HTML5, CSS3, and JavaScript.
 - **↑ Arrow Key**: Rotate piece clockwise
 - **↓ Arrow Key**: Soft drop (faster fall)
 - **Space Bar**: Hard drop (instant drop)
-- **Shift**: Hold current piece
 - **P**: Pause/Resume game
 
 ### Mobile (Touch)
@@ -67,6 +66,21 @@ A modern, responsive Tetris game built with vanilla HTML5, CSS3, and JavaScript.
 - **Dynamic Canvas Resizing**: Adapts to different screen sizes
 - **Touch Event Handling**: Advanced gesture recognition for mobile
 - **Progressive Difficulty**: Algorithm-based speed scaling
+
+## 📊 Game Interface
+
+### Desktop Features
+- **Score & Statistics**: Complete game stats display
+- **Next Piece Preview**: Shows upcoming Tetrimino
+- **Audio Controls**: Volume slider and mute toggle
+- **Game Timer**: Real-time play duration tracking
+
+### Mobile Features
+- **Streamlined UI**: Clean, minimal interface optimized for mobile
+- **Essential Stats Only**: Score and time display
+- **Touch-Optimized**: Large, accessible touch targets
+- **Game Over Popup**: Modal with final stats and restart option
+- **No Distractions**: Removed tooltips and unnecessary UI elements
 
 ## 📊 Game Mechanics
 
@@ -131,6 +145,8 @@ web-tetris/
 - **Responsive Canvas**: Dynamic sizing for mobile viewports
 - **Performance**: Optimized for 60fps on mobile devices
 - **UI Adaptation**: Touch-friendly controls and layouts
+- **Streamlined Interface**: Clean mobile UI with essential game info only
+- **Device Detection**: Automatic control scheme based on device type
 
 ## 🌟 Browser Compatibility
 
