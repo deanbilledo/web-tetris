@@ -14,7 +14,7 @@ const PIECES = [
 ];
 
 // --- STATE ---
-let board, current, next, hold, canHold, bag, score, level, lines, dropInterval, dropTimer, paused, gameOver;
+let board, current, next, bag, score, level, lines, dropInterval, dropTimer, paused, gameOver;
 let keys = {}, touchStart = null, volume = 0.5, muted = false;
 let canvas, ctx, bgCanvas, bgCtx;
 let gameStartTime = 0, gameDuration = 0;
@@ -177,21 +177,6 @@ function hardDrop() {
   playSound('harddrop');
 }
 
-function holdPiece() {
-  if (gameOver || paused || !canHold) return;
-  if (hold) {
-    [current, hold] = [hold, current];
-    current.x = Math.floor(COLS / 2) - 2;
-    current.y = 0;
-  } else {
-    hold = current;
-    current = createPiece(next);
-    next = createPiece(randomPiece());
-  }
-  canHold = false;
-  playSound('hold');
-}
-
 function placePiece() {
   if (!current) return;
   
@@ -214,7 +199,6 @@ function placePiece() {
   
   current = createPiece(next);
   next = createPiece(randomPiece());
-  canHold = true;
   
   if (!isValidMove(current, 0, 0)) {
     gameOver = true;
@@ -282,6 +266,63 @@ function draw() {
     const currentTime = Date.now() - gameStartTime;
     document.getElementById('game-time').textContent = formatTime(currentTime);
   }
+  
+  // Draw next piece preview
+  drawNextPiece();
+}
+
+function drawNextPiece() {
+  const nextContainer = document.getElementById('next-piece');
+  if (!nextContainer || !next) return;
+  
+  // Clear previous content
+  nextContainer.innerHTML = '';
+  
+  // Determine canvas size based on viewport
+  const isMobileView = window.innerWidth <= 768;
+  const canvasSize = isMobileView ? 60 : 80;
+  const blockSize = isMobileView ? 12 : 16;
+  
+  // Create a small canvas for the next piece
+  const nextCanvas = document.createElement('canvas');
+  nextCanvas.width = canvasSize;
+  nextCanvas.height = canvasSize;
+  nextCanvas.style.display = 'block';
+  nextCanvas.style.margin = '0 auto';
+  nextCanvas.style.width = canvasSize + 'px';
+  nextCanvas.style.height = canvasSize + 'px';
+  
+  const nextCtx = nextCanvas.getContext('2d');
+  nextCtx.fillStyle = '#181825';
+  nextCtx.fillRect(0, 0, canvasSize, canvasSize);
+  
+  // Draw the next piece centered
+  if (next && next.shape) {
+    // Calculate the bounds of the piece
+    const minX = Math.min(...next.shape.map(([x, y]) => x));
+    const maxX = Math.max(...next.shape.map(([x, y]) => x));
+    const minY = Math.min(...next.shape.map(([x, y]) => y));
+    const maxY = Math.max(...next.shape.map(([x, y]) => y));
+    
+    const pieceWidth = (maxX - minX + 1) * blockSize;
+    const pieceHeight = (maxY - minY + 1) * blockSize;
+    
+    // Center the piece in the canvas
+    const offsetX = (canvasSize - pieceWidth) / 2 - minX * blockSize;
+    const offsetY = (canvasSize - pieceHeight) / 2 - minY * blockSize;
+    
+    nextCtx.fillStyle = next.color;
+    for (let [px, py] of next.shape) {
+      const x = offsetX + px * blockSize;
+      const y = offsetY + py * blockSize;
+      nextCtx.fillRect(x, y, blockSize, blockSize);
+      nextCtx.strokeStyle = '#fff';
+      nextCtx.lineWidth = 1;
+      nextCtx.strokeRect(x, y, blockSize, blockSize);
+    }
+  }
+  
+  nextContainer.appendChild(nextCanvas);
 }
 
 function drawBackground() {
@@ -363,8 +404,6 @@ function resetGame() {
   bag = [];
   current = createPiece(randomPiece());
   next = createPiece(randomPiece());
-  hold = null;
-  canHold = true;
   score = 0;
   level = 1;
   lines = 0;
@@ -392,8 +431,6 @@ function setupControls() {
       case 'ArrowDown': softDrop(); break;
       case 'ArrowUp': rotate(); break;
       case 'Space': e.preventDefault(); hardDrop(); break;
-      case 'ShiftLeft':
-      case 'ShiftRight': holdPiece(); break;
       case 'KeyP': 
         paused = !paused;
         if (paused) {
@@ -499,7 +536,6 @@ function makeSounds() {
   sounds['rotate'] = synth(440, 0.08);
   sounds['softdrop'] = synth(330, 0.05);
   sounds['harddrop'] = synth(660, 0.08);
-  sounds['hold'] = synth(550, 0.08);
   sounds['line1'] = synth(880, 0.12);
   sounds['line2'] = synth(660, 0.12);
   sounds['line3'] = synth(440, 0.12);

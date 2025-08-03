@@ -75,7 +75,7 @@ body {
   font-size: 0.9em;
 }
 
-.next-piece, .hold-piece {
+.next-piece {
   width: 80px;
   height: 80px;
   background: #181825;
@@ -230,7 +230,7 @@ canvas {
     display: none;
   }
   
-  .next-piece, .hold-piece, .controls, .audio-controls {
+  .next-piece, .controls, .audio-controls {
     display: none;
   }
   
@@ -277,7 +277,7 @@ canvas {
     font-size: 0.65em;
   }
   
-  .next-piece, .hold-piece {
+  .next-piece {
     width: 50px;
     height: 50px;
   }
